@@ -26,7 +26,7 @@ local function enqueue_with_depth(depth, fn, extra)
 end
 
 local function run_test(test, mod_context, test_context)
-    print('running test ' .. tostring(test_context.test_number) .. ' from ' .. mod_context.mod)
+    print('running test ' .. tostring(test_context.test_number) .. ' from ' .. mod_context.mod_key)
     test.jokers = test.jokers or {}
     test.play = test.play or {'H_A'}
     test.hand = test.hand or {}
@@ -71,19 +71,27 @@ local function run_test(test, mod_context, test_context)
     end)
 end
 
-local function run_tests(tests, mod_context)
+local function run_tests(mod_test_groups)
+    local tests = {}
+    for i, mod_test_group in ipairs(mod_test_groups) do
+        for j, test in ipairs(mod_test_group.tests) do
+            table.insert(tests, { test = test, mod_test_group = mod_test_group })
+        end
+    end
     local function queue_test(index)
         local test_context = {
             test_number = index,
             failed = false,
             failure_reason = nil,
-            name = 'test ' .. tostring(index) .. ' from ' .. mod_context.mod,
+            name = 'test ' .. tostring(index) .. ' from ' .. tests[index].mod_test_group.mod_key,
         }
         test_context.fail = function(reason)
             reason = reason or ''
             test_context.failed = true
             test_context.failure_reason = test_context.failure_reason or reason
         end
+        local original_g_funcs_hud_blind_debuff = G.FUNCS.HUD_blind_debuff
+        G.FUNCS.HUD_blind_debuff = function() end
         if G.STAGE == G.STAGES.MAIN_MENU then
             G.FUNCS.start_setup_run()
         else
@@ -99,13 +107,16 @@ local function run_tests(tests, mod_context)
             G.challenge_tab = nil
             G.forced_seed = nil
         end
+        enqueue_with_depth(0, function ()
+            G.FUNCS.HUD_blind_debuff = original_g_funcs_hud_blind_debuff
+        end)
         enqueue_with_depth(9, function()
             G.blind_select_opts.small:get_UIE_by_ID('select_blind_button'):click()
         end, {
             no_delete = true
         })
         enqueue_with_depth(10, function()
-            run_test(tests[index], mod_context, test_context)
+            run_test(tests[index].test, tests[index].mod_test_group, test_context)
             enqueue_with_depth(10, function()
                 if test_context.failed then
                     sendWarnMessage('Failed: '..test_context.name.. (test_context.failure_reason and ': ' or '') ..test_context.failure_reason)
@@ -138,13 +149,13 @@ local function run_tests(tests, mod_context)
 end
 
 local function run_all()
+    local mod_test_groups = {}
     for key, mod in pairs(SMODS.Mods) do
         if mod.regression_tests then
-            run_tests(mod.regression_tests, {
-                mod = key
-            })
+            table.insert(mod_test_groups, { tests = mod.regression_tests, mod = mod, mod_key = key})
         end
     end
+    run_tests(mod_test_groups)
 end
 
 SMODS.Keybind {
