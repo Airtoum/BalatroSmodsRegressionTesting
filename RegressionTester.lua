@@ -301,34 +301,39 @@ end
 
 -- todo: G.pack_cards
 function RegressionTester.actions.Buy_From_Shop(test_context, args)
-    args = args or {}
-    local button_key = args.buy_and_use and 'buy_and_use_button' or 'buy_button'
-    local index = args.index
-    if not index and args.key then
-        for i, card in ipairs(G.shop_jokers.cards) do
-            if card and card.config and card.config.center and card.config.center.key == args.key then
-                index = i
-                break
+    enqueue_with_depth(1, function()
+        args = args or {}
+        local button_key = args.buy_and_use and 'buy_and_use_button' or 'buy_button'
+        local index = args.index
+        if not index and args.key then
+            for i, card in ipairs(G.shop_jokers.cards) do
+                if card and card.config and card.config.center and card.config.center.key == args.key then
+                    index = i
+                    break
+                end
+            end
+            if not index then
+                sendWarnMessage('Did not find any shop jokers with the key '.. tostring(args.key), LOGGER_NAME)
             end
         end
-    end
-    index = index or 1
-    if (
-        not G or
-        not G.shop_jokers or
-        not G.shop_jokers.cards or
-        not G.shop_jokers.cards[index] or
-        not G.shop_jokers.cards[index].children or
-        not G.shop_jokers.cards[index].children[button_key] or
-        not G.shop_jokers.cards[index].children[button_key].UIRoot or
-        not G.shop_jokers.cards[index].children[button_key].UIRoot.children or
-        not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1] or
-        not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1].click
-    ) then
-        test_context.fail_and_stop('Test runner could not find the "'..button_key..'" for shop joker '.. tostring(args.key or index))
-    else
-        G.shop_jokers.cards[index].children[button_key].UIRoot.children[1]:click()
-    end
+        index = index or 1
+        if (
+            not G or
+            not G.shop_jokers or
+            not G.shop_jokers.cards or
+            not G.shop_jokers.cards[index] or
+            not G.shop_jokers.cards[index].children or
+            not G.shop_jokers.cards[index].children[button_key] or
+            not G.shop_jokers.cards[index].children[button_key].UIRoot or
+            not G.shop_jokers.cards[index].children[button_key].UIRoot.children or
+            not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1] or
+            not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1].click
+        ) then
+            test_context.fail_and_stop('Test runner could not find the "'..button_key..'" for shop joker '.. tostring(args.key or index))
+        else
+            G.shop_jokers.cards[index].children[button_key].UIRoot.children[1]:click()
+        end
+    end)
     return { loops = 4 }
 end
 
@@ -339,8 +344,33 @@ function RegressionTester.actions.Buy_And_Use_From_Shop(test_context, args)
 end
 
 function RegressionTester.actions.Exit_Shop(test_context, args)
-    G.FUNCS.toggle_shop()
+    enqueue_with_depth(1, G.FUNCS.toggle_shop)
     return { loops = 4 }
+end
+
+function RegressionTester.sell_card_from_cardarea(test_context, cardarea, args)
+    enqueue_with_depth(1, function()
+        local index = args.index
+        if not index and args.key then
+            for i, card in ipairs(cardarea.cards) do
+                if card and card.config and card.config.center and card.config.center.key == args.key then
+                    index = i
+                    break
+                end
+            end
+        end
+        index = index or 1
+        cardarea.cards[index]:sell_card()
+    end)
+    return { loops = 3 }
+end
+
+function RegressionTester.actions.Sell_Joker(test_context, args)
+    return RegressionTester.sell_card_from_cardarea(test_context, G.jokers, args)
+end
+
+function RegressionTester.actions.Sell_Consumeable(test_context, args)
+    return RegressionTester.sell_card_from_cardarea(test_context, G.consumeables, args)
 end
 
 local function run_test(test, mod_context, test_context)
