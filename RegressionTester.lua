@@ -10,30 +10,75 @@
 ------------MOD CODE -------------------------
 local RegressionTester = SMODS.current_mod
 
-local function enqueue_with_depth(depth, fn, extra)
+local REGRESSION_TEST_QUEUE_NAME = 'regression_tests'
+
+RegressionTester.actions = {}
+
+local function enqueue_with_depth(depth, fn, extra, queue)
     extra = extra or {}
+    queue = queue or nil
+    if depth == 0 then
+        fn()
+        return
+    end
     G.E_MANAGER:add_event(Event({
         func = function()
-            if depth == 0 then
-                fn()
-            else
-                enqueue_with_depth(depth - 1, fn)
-            end
+            enqueue_with_depth(depth - 1, fn)
             return true
         end,
         no_delete = extra.no_delete
-    }))
+    }), queue)
 end
 
-local function run_test(test, mod_context, test_context)
-    print('running test ' .. tostring(test_context.test_number) .. ' from ' .. mod_context.mod_key)
-    test.jokers = test.jokers or {}
-    test.play = test.play or {'H_A'}
-    test.hand = test.hand or {}
+local function with_patience(patience, ready_fn, fn, out_of_patience_fn)
+    if patience <= -1 then
+        out_of_patience_fn()
+        return
+    end
+    enqueue_with_depth(0, function ()
+        if not ready_fn() then
+            with_patience(patience - 1, ready_fn, fn)
+        else
+            fn()
+        end
+    end)
+end
 
-    -- local original_game_over_state = G.STATES.GAME_OVER
-    -- G.STATES.GAME_OVER = G.STATES.SELECTING_HAND
+function RegressionTester.actions.Noop(test_context, args)
+    return { loops = 0 }
+end
 
+function RegressionTester.actions.Missing_Action(test_context, args)
+    test_context.fail_and_stop('Test runner does not have an action named "'.. args..'"')
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Loop(test_context, args)
+    return { loops = args.loops }
+end
+
+function RegressionTester.actions.Select_Blind(test_context, args)
+    local blind = args.blind or 'small'
+    with_patience(
+        10,
+        function ()
+            return (
+                G and
+                G.blind_select_opts and
+                G.blind_select_opts[blind] and
+                G.blind_select_opts[blind]:get_UIE_by_ID('select_blind_button') and
+                G.blind_select_opts[blind]:get_UIE_by_ID('select_blind_button').click
+            )
+        end,
+        function ()
+            G.blind_select_opts[blind]:get_UIE_by_ID('select_blind_button'):click()
+        end,
+        function () test_context.fail_and_stop('Test runner could not find "Select Blind button."') end
+        )
+    return { loops = 10 }
+end
+
+function RegressionTester.actions.Destroy_All_Cards(test_context, args)
     for k, v in pairs(G.jokers.cards) do
         v:start_dissolve(nil)
     end
@@ -43,32 +88,128 @@ local function run_test(test, mod_context, test_context)
     for k, v in pairs(G.deck.cards) do
         v:start_dissolve(nil)
     end
+    return { loops = 0 }
+end
 
-    for i, joker_key in ipairs(test.jokers) do
+function RegressionTester.actions.Create_Cards(test_context, args)
+    args = args or {}
+    args.jokers = args.jokers or {}
+    args.selected = args.selected or {}
+    args.hand = args.hand or {}
+    for i, joker_key in ipairs(args.jokers) do
         local card = create_card('Joker', G.jokers, nil, 0, true, nil, joker_key)
         card:add_to_deck()
         G.jokers:emplace(card)
     end
-    for i, key in ipairs(test.play) do
+    for i, key in ipairs(args.selected) do
         local card = create_playing_card({
             front = G.P_CARDS[key]
         }, G.hand)
         G.hand:add_to_highlighted(card)
     end
-    for i, key in ipairs(test.hand) do
+    for i, key in ipairs(args.hand) do
         local card = create_playing_card({
             front = G.P_CARDS[key]
         }, G.hand)
     end
-    -- enqueue_with_depth(2, function ()
-    --     G.STATES.GAME_OVER = original_game_over_state
-    -- end)
-    enqueue_with_depth(2, G.FUNCS.play_cards_from_highlighted)
-    enqueue_with_depth(5, function()
-        if (test.expect.score and G.GAME.chips ~= test.expect.score) then
-            test_context.fail('chips of '..G.GAME.chips..' did not match expected '..test.expect.score)
+    return { loops = 3 }
+end
+
+function RegressionTester.actions.Play_Hand(test_context, args)
+    if #G.hand.highlighted == 0 then
+        sendWarnMessage('Test Runner is playing a hand with 0 cards selected (this may crash, unless a mod supports this)')
+    end
+    G.FUNCS.play_cards_from_highlighted()
+    return { loops = 3 }
+end
+
+function RegressionTester.actions.Discard(test_context, args)
+    if #G.hand.highlighted == 0 then
+        sendWarnMessage('Test Runner is discarding with 0 cards selected')
+    end
+    G.FUNCS.discard_cards_from_highlighted()
+    return { loops = 3 }
+end
+
+function RegressionTester.expect_equal(test_context, name, actual, expected)
+    if actual ~= expected then
+        local actual_repr = type(actual) == 'string' and ('"'..actual..'"') or tostring(actual)
+        local expected_repr = type(expected) == 'string' and ('"'..expected..'"') or tostring(expected)
+        test_context.fail(name..' of '..actual_repr..' did not match expected '..expected_repr)
+    end
+end
+
+function RegressionTester.actions.Expect(test_context, args)
+    if (args.score) then
+        RegressionTester.expect_equal(test_context, 'G.GAME.chips', G.GAME.chips, args.score)
+    end
+    if (args.dollars) then
+        RegressionTester.expect_equal(test_context, 'G.GAME.dollars', G.GAME.dollars, args.dollars)
+    end
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Expect_Game_Over_By_End(test_context, args)
+    if args == nil then
+        args = true
+    end
+    test_context.expect_game_over = args
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Fail(test_context, args)
+    args = args or 'A Fail instruction executed'
+    test_context.fail(args)
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Set_Money(test_context, args)
+    ease_dollars(-G.GAME.dollars + args or 0, true)
+    return { loops = 1 }
+end
+
+function RegressionTester.actions.Add_Money(test_context, args)
+    ease_dollars(args or 0, true)
+    return { loops = 1 }
+end
+
+function RegressionTester.actions.Set_Hand_Selection_Limit(test_context, args)
+    G.hand.config.highlighted_limit = args or 0
+    return { loops = 0 }
+end
+
+local function run_test(test, mod_context, test_context)
+    print('running test ' .. tostring(test_context.test_number) .. ' from ' .. mod_context.mod_key)
+
+    local instructions = test
+    instructions[0] = { action = 'Loop', args = { loops = 4 } }
+
+    local instruction_number = 0
+    local function queue_next_instruction()
+        local instruction = instructions[instruction_number] 
+        local action = (
+            ((not instruction or not instruction.action) and 'Noop') or 
+            (RegressionTester.actions[instruction.action] and instruction.action) or 
+            'Missing_Action'
+        )
+        print(action)
+        local action_function = RegressionTester.actions[action]
+        local args = instruction and instruction.args
+        local action_result = action_function(test_context, args)
+        local loops = (action_result and action_result.loops) or 0
+        if not instructions[instruction_number + 1] then
+            test_context.done()
         end
-    end)
+        if not test_context.finished then
+            instruction_number = instruction_number + 1
+            enqueue_with_depth(loops, queue_next_instruction)
+        end
+    end
+
+    enqueue_with_depth(1, function ()
+        queue_next_instruction()
+    end, { no_delete = true })
+
 end
 
 local function run_tests(mod_test_groups)
@@ -81,74 +222,93 @@ local function run_tests(mod_test_groups)
     local function queue_test(index)
         local test_context = {
             test_number = index,
+            name = 'test ' .. tostring(index) .. ' from ' .. tests[index].mod_test_group.mod_key,
             failed = false,
             failure_reason = nil,
-            name = 'test ' .. tostring(index) .. ' from ' .. tests[index].mod_test_group.mod_key,
+            finished = false,
+            expect_game_over = nil,
         }
         test_context.fail = function(reason)
             reason = reason or ''
             test_context.failed = true
             test_context.failure_reason = test_context.failure_reason or reason
         end
-        local original_g_funcs_hud_blind_debuff = G.FUNCS.HUD_blind_debuff
-        G.FUNCS.HUD_blind_debuff = function() end
-        if G.STAGE == G.STAGES.MAIN_MENU then
-            G.FUNCS.start_setup_run()
-        else
-            G.SETTINGS.current_setup = 'New Run'
-            G.GAME.viewed_back = nil
-            G.run_setup_seed = G.GAME.seeded
-            G.challenge_tab = G.GAME and G.GAME.challenge and G.GAME.challenge_tab or nil
-            G.forced_seed, G.setup_seed = nil, nil
-            if G.GAME.seeded then G.forced_seed = G.GAME.pseudorandom.seed end
-            G.forced_stake = G.GAME.stake
-            if G.STAGE == G.STAGES.RUN then G.FUNCS.start_setup_run() end
-            G.forced_stake = nil
-            G.challenge_tab = nil
-            G.forced_seed = nil
+        function test_context.done()
+            test_context.finished = true
         end
-        enqueue_with_depth(0, function ()
-            G.FUNCS.HUD_blind_debuff = original_g_funcs_hud_blind_debuff
-        end)
-        enqueue_with_depth(9, function()
-            G.blind_select_opts.small:get_UIE_by_ID('select_blind_button'):click()
-        end, {
-            no_delete = true
-        })
-        enqueue_with_depth(10, function()
-            run_test(tests[index].test, tests[index].mod_test_group, test_context)
-            enqueue_with_depth(10, function()
-                if test_context.failed then
-                    sendWarnMessage('Failed: '..test_context.name.. (test_context.failure_reason and ': ' or '') ..test_context.failure_reason)
-                    -- enqueue_with_depth(0,
-                    --     function ()
-                            --card_eval_status_text({}, 'extra', 1, 1, nil, {message = 'Failed: '..test_context.name, colour = G.C.MULT, no_juice = true})
-                    --     end,
-                    --     {no_delete = true}
-                  --   )
+        function test_context.fail_and_stop(reason)
+            test_context.fail(reason)
+            test_context.done()
+        end
+        local original_g_funcs_hud_blind_debuff = G.FUNCS.HUD_blind_debuff
+        G.E_MANAGER:add_event(Event({
+            no_delete = true,
+            pause_force = true,
+            func = function()
+                G.FUNCS.HUD_blind_debuff = function() end
+                if G.STAGE == G.STAGES.MAIN_MENU then
+                    G.FUNCS.start_setup_run()
                 else
-                    sendInfoMessage('Pass: '..test_context.name)
-                    -- enqueue_with_depth(0, 
-                    --     function ()
-                            --card_eval_status_text({}, 'extra', 1, 1, nil, {message = 'Pass: '..test_context.name, colour = G.C.CHANCE, no_juice = true})
-                    --     end,
-                    --     {no_delete = true}
-                    -- )
+                    if G.STATE == G.STATES.GAME_OVER then G.STATE = G.STATES.MENU end
+                    G.SETTINGS.current_setup = 'New Run'
+                    G.GAME.viewed_back = nil
+                    G.run_setup_seed = G.GAME.seeded
+                    G.challenge_tab = G.GAME and G.GAME.challenge and G.GAME.challenge_tab or nil
+                    G.forced_seed, G.setup_seed = nil, nil
+                    if G.GAME.seeded then G.forced_seed = G.GAME.pseudorandom.seed end
+                    G.forced_stake = G.GAME.stake
+                    if G.STAGE == G.STAGES.RUN then G.FUNCS.start_setup_run() end
+                    G.forced_stake = nil
+                    G.challenge_tab = nil
+                    G.forced_seed = nil
                 end
-
-                if index < #tests then
-                    queue_test(index + 1)
+                return true
+            end,
+        }), REGRESSION_TEST_QUEUE_NAME)
+        
+        G.E_MANAGER:add_event(Event({
+            no_delete = true,
+            pause_force = true,
+            func = function()
+                G.FUNCS.HUD_blind_debuff = original_g_funcs_hud_blind_debuff
+                run_test(tests[index].test, tests[index].mod_test_group, test_context)
+                return true
+            end,
+        }), REGRESSION_TEST_QUEUE_NAME)
+        -- block regression test queue until finished
+        G.E_MANAGER:add_event(Event({
+            no_delete = true,
+            pause_force = true,
+            func = function()
+                if G.STATE == G.STATES.GAME_OVER then
+                    if (test_context.expect_game_over == false) then
+                        test_context.fail('Test expected no game over to happen, but a game over happened')
+                    end
+                    test_context.done()
                 end
-            end)
-            return true
-        end, {
-            no_delete = true
-        })
+                if test_context.finished then
+                    if (test_context.expect_game_over == true and not G.STATE == G.STATES.GAME_OVER) then
+                        test_context.fail('Test expected a game over to happen, but no game over happened')
+                    end
+                    if test_context.failed then
+                        sendWarnMessage('Failed: '..test_context.name.. (test_context.failure_reason and ': ' or '') ..test_context.failure_reason)
+                    else
+                        sendInfoMessage('Pass: '..test_context.name)
+                    end
+                end
+                return test_context.finished
+            end,
+        }), REGRESSION_TEST_QUEUE_NAME)
+        delay(0.1, REGRESSION_TEST_QUEUE_NAME)
     end
-    queue_test(1)
+
+    for i = 1, #tests do
+        queue_test(i)
+    end
 end
 
 local function run_all()
+    G.E_MANAGER.queues[REGRESSION_TEST_QUEUE_NAME] = G.E_MANAGER.queues[REGRESSION_TEST_QUEUE_NAME] or {}
     local mod_test_groups = {}
     for key, mod in pairs(SMODS.Mods) do
         if mod.regression_tests then
@@ -169,24 +329,64 @@ SMODS.Keybind {
 
 RegressionTester.regression_tests = {
     [1] = {
-        jokers = {'j_joker'},
-        play = {'H_T', 'H_T', 'H_T', 'H_T', 'H_T'},
-        expect = {
-            score = 4200
-        }
+        { action = 'Select_Blind', args = 'small' },
+        { action = 'Destroy_All_Cards' },
+        { action = 'Create_Cards', args = {
+            jokers = {'j_joker'},
+            selected = {'H_T', 'H_T', 'H_T', 'H_T', 'H_T'}, 
+        }},
+        { action = 'Play_Hand' },
+        { action = 'Expect', args = {
+            score = 4200,
+        }},
     },
     [2] = {
-        jokers = {'j_joker', 'j_greedy_joker'},
-        play = {'D_T', 'D_T', 'S_T'},
-        expect = {
-            score = 780
-        }
+        { action = 'Select_Blind', args = 'small' },
+        { action = 'Destroy_All_Cards' },
+        { action = 'Create_Cards', args = {
+            jokers = {'j_joker', 'j_greedy_joker'},
+            selected = {'D_T', 'D_T', 'S_T'},
+        }},
+        { action = 'Play_Hand' },
+        { action = 'Expect', args = {
+            score = 780,
+        }},
     },
     [3] = {
-        jokers = {'j_joker', 'j_greedy_joker'},
-        play = {'D_T', 'D_T', 'S_T'},
-        expect = {
-            score = 1280
-        }
+        { action = 'Select_Blind', args = 'small' },
+        { action = 'Destroy_All_Cards' },
+        { action = 'Create_Cards', args = {
+            jokers = {'j_joker', 'j_greedy_joker'},
+            selected = {'D_T', 'D_T', 'S_T'},
+            hand = {'H_K','H_3','H_8','H_A','H_8'},
+        }},
+        { action = 'Play_Hand' },
+        { action = 'Expect', args = {
+            score = 'this test fails',
+        }},
+    },
+    [4] = {
+        { action = 'Expect_Game_Over_By_End' },
+        { action = 'Select_Blind', args = 'small' },
+        { action = 'Destroy_All_Cards' },
+        { action = 'Create_Cards', args = {
+            selected = {'S_2'},
+        }},
+        { action = 'Play_Hand' },
+        { action = 'Noop' }
+    },
+    [5] = {
+        { action = 'Select_Blind', args = 'small' },
+        { action = 'Set_Money', args = 30 },
+        { action = 'Set_Hand_Selection_Limit', args = 13 },
+        { action = 'Destroy_All_Cards' },
+        { action = 'Create_Cards', args = {
+            jokers = {'j_castle', 'j_mail', 'j_burnt', 'j_hit_the_road'},
+            selected = {'S_A', 'H_K', 'C_Q', 'D_J', 'S_T', 'S_9', 'S_8', 'S_7', 'S_6', 'S_5', 'S_4', 'S_3', 'S_2'},
+        }},
+        { action = 'Discard' },
+        { action = 'Expect', args = {
+            dollars = 35,
+        }},
     }
 }
