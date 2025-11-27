@@ -19,10 +19,10 @@ RegressionTester.actions = {}
 local function string_join(t, delimiter)
     local string_acc = ''
     for i, v in ipairs(t) do
-        string_acc = string_acc .. tostring(v)
         if i > 1 then
             string_acc = delimiter .. string_acc
         end
+        string_acc = string_acc .. tostring(v)
     end
     return string_acc
 end
@@ -108,12 +108,28 @@ function RegressionTester.actions.Destroy_Jokers(test_context, args)
     for k, v in pairs(G.jokers.cards) do
         v:start_dissolve(nil)
     end
+    return { loops = 0 }
 end
 
 function RegressionTester.actions.Destroy_Consumeables(test_context, args)
     for k, v in pairs(G.consumeables.cards) do
         v:start_dissolve(nil)
     end
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Destroy_Hand(test_context, args)
+    for k, v in pairs(G.hand.cards) do
+        v:start_dissolve(nil)
+    end
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Destroy_Deck(test_context, args)
+    for k, v in pairs(G.deck.cards) do
+        v:start_dissolve(nil)
+    end
+    return { loops = 0 }
 end
 
 function RegressionTester.actions.Create_Cards(test_context, args)
@@ -212,6 +228,9 @@ function RegressionTester.actions.Expect(test_context, args)
     if (args.consumeables) then
         RegressionTester.expect_card_keys_in_cardarea(test_context, 'Consumeables', G.consumeables, args.consumeables)
     end
+    if (not args.continue_on_fail and test_context.failed) then
+        test_context.done()
+    end
     return { loops = 0 }
 end
 
@@ -299,24 +318,31 @@ function RegressionTester.actions.Create_Shop(test_context, args)
     return { loops = 3 }
 end
 
+function RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
+    if type(args) == 'number' then args = { index = args } end
+    if type(args) == 'string' then args = { key = args } end
+    local index = args.index
+    if not index and args.key then
+        for i, card in ipairs(cardarea.cards) do
+            if card and card.config and card.config.center and card.config.center.key == args.key then
+                index = i
+                break
+            end
+        end
+        if not index then
+            sendWarnMessage('Did not find any '..cardarea_name..' with the key '.. tostring(args.key), LOGGER_NAME)
+        end
+    end
+    index = index or 1
+    return index
+end
+
 -- todo: G.pack_cards
 function RegressionTester.actions.Buy_From_Shop(test_context, args)
     enqueue_with_depth(1, function()
         args = args or {}
         local button_key = args.buy_and_use and 'buy_and_use_button' or 'buy_button'
-        local index = args.index
-        if not index and args.key then
-            for i, card in ipairs(G.shop_jokers.cards) do
-                if card and card.config and card.config.center and card.config.center.key == args.key then
-                    index = i
-                    break
-                end
-            end
-            if not index then
-                sendWarnMessage('Did not find any shop jokers with the key '.. tostring(args.key), LOGGER_NAME)
-            end
-        end
-        index = index or 1
+        local index = RegressionTester.find_card_in_cardarea(test_context, 'shop jokers', G.shop_jokers, args)
         if (
             not G or
             not G.shop_jokers or
@@ -348,29 +374,56 @@ function RegressionTester.actions.Exit_Shop(test_context, args)
     return { loops = 4 }
 end
 
-function RegressionTester.sell_card_from_cardarea(test_context, cardarea, args)
-    enqueue_with_depth(1, function()
-        local index = args.index
-        if not index and args.key then
-            for i, card in ipairs(cardarea.cards) do
-                if card and card.config and card.config.center and card.config.center.key == args.key then
-                    index = i
-                    break
-                end
-            end
-        end
-        index = index or 1
-        cardarea.cards[index]:sell_card()
-    end)
+function RegressionTester.actions.Reroll_Shop(test_context, args)
+    enqueue_with_depth(1, G.FUNCS.reroll_shop)
+    return { loops = 4 }
+end
+
+function RegressionTester.sell_card_from_cardarea(test_context, cardarea_name, cardarea, args)
+    local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
+    cardarea.cards[index]:sell_card()
     return { loops = 3 }
 end
 
 function RegressionTester.actions.Sell_Joker(test_context, args)
-    return RegressionTester.sell_card_from_cardarea(test_context, G.jokers, args)
+    return RegressionTester.sell_card_from_cardarea(test_context, 'jokers', G.jokers, args)
 end
 
 function RegressionTester.actions.Sell_Consumeable(test_context, args)
-    return RegressionTester.sell_card_from_cardarea(test_context, G.consumeables, args)
+    return RegressionTester.sell_card_from_cardarea(test_context, 'consumeables', G.consumeables, args)
+end
+
+function RegressionTester.select_card(test_context, cardarea_name, cardarea, args)
+    local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
+    cardarea:add_to_highlighted(cardarea.cards[index])
+    return { loops = 2 }
+end
+
+function RegressionTester.actions.Select_Joker(test_context, args)
+    return RegressionTester.select_card(test_context, 'jokers', G.jokers, args)
+end
+
+function RegressionTester.actions.Select_Consumeable(test_context, args)
+    return RegressionTester.select_card(test_context, 'consumeables', G.consumeables, args)
+end
+
+function RegressionTester.actions.Use_Consumeable(test_context, args)
+    local index = RegressionTester.find_card_in_cardarea(test_context, 'consumeables', G.consumeables, args)
+    local consumeable = G.consumeables.cards[index]
+    if not consumeable.highlighted then
+        RegressionTester.actions.Select_Consumeable(test_context, args)
+    end
+    enqueue_with_depth(1, function()
+        consumeable.children.use_button.UIRoot.children[1].children[2].children[1].children[1].children[1]:click()
+    end)
+    return { loops = 12 }
+end
+
+function RegressionTester.actions.Select_Cards_From_Hand(test_context, args)
+    for i, subarg in ipairs(args) do
+        RegressionTester.select_card(test_context, 'hand', G.hand, subarg)
+    end
+    return { loops = 2 }
 end
 
 local function run_test(test, mod_context, test_context)
@@ -428,14 +481,14 @@ local function run_tests(mod_test_groups)
             short_name = test_name,
             name = 'test ' .. test_name .. ' from ' .. test.mod_test_group.mod_key,
             failed = false,
-            failure_reason = nil,
+            failure_reasons = {},
             finished = false,
             expect_game_over = nil,
         }
-        test_context.fail = function(reason)
+        function test_context.fail(reason)
             reason = reason or ''
             test_context.failed = true
-            test_context.failure_reason = test_context.failure_reason or reason
+            table.insert(test_context.failure_reasons, reason)
         end
         function test_context.done()
             test_context.finished = true
@@ -496,7 +549,13 @@ local function run_tests(mod_test_groups)
                         test_context.fail('Test expected a game over to happen, but no game over happened')
                     end
                     if test_context.failed then
-                        sendWarnMessage('Failed: '..test_context.name.. (test_context.failure_reason and ': ' or '') ..test_context.failure_reason, LOGGER_NAME)
+                        if #test_context.failure_reasons == 0 then
+                            sendWarnMessage('Failed: ' .. test_context.name, LOGGER_NAME)
+                        else
+                            for i, failure_reason in ipairs(test_context.failure_reasons) do
+                                sendWarnMessage('Failed: '.. test_context.name .. ': ' .. failure_reason, LOGGER_NAME)
+                            end
+                        end
                     else
                         sendInfoMessage('Pass: '..test_context.name, LOGGER_NAME)
                     end
@@ -652,12 +711,12 @@ RegressionTester.regression_tests = {
         name = 'Buy from Shop',
         actions = {
             { action = 'Select_Blind', args = 'small' },
-            { action = 'Set_Money', args = 10 },
             { action = 'Win_Blind' },
             { action = 'Cash_Out' },
+            { action = 'Set_Money', args = 25 },
             { action = 'Destroy_Shop' },
             { action = 'Create_Shop', args = {
-                jokers = {'j_mime', 'j_jolly', 'c_earth', 'c_fool'},
+                jokers = {'j_mime', 'j_jolly', 'c_jupiter', 'c_fool'},
                 boosters = {'p_buffoon_mega_1', 'p_arcana_mega_2'},
                 vouchers = {'v_antimatter'},
             }},
@@ -667,10 +726,42 @@ RegressionTester.regression_tests = {
             { action = 'Buy_From_Shop', args = { key = 'j_mime' } },
             { action = 'Expect', args = {
                 jokers = { 'j_jolly', 'j_mime' },
-                consumeables = { 'c_fool' }
+                consumeables = { 'c_fool' },
+                dollars = 25 - (3 + 3 + 3 + 5),
+            }},
+            { action = 'Use_Consumeable', args = { key = 'c_fool' }},
+            { action = 'Use_Consumeable', args = { key = 'c_jupiter' }},
+            { action = 'Reroll_Shop' },
+            { action = 'Destroy_Shop' },
+            { action = 'Create_Shop', args = {
+                jokers = {'c_sun', 'j_blueprint'},
+                boosters = {'p_buffoon_mega_1', 'p_arcana_mega_2'},
+                vouchers = {'v_antimatter'},
+                consumeables = {}
+            }},
+            { action = 'Buy_From_Shop', args = { key = 'c_sun' } },
+            { action = 'Buy_From_Shop', args = { key = 'j_blueprint' } },
+            { action = 'Expect', args = {
+                jokers = { 'j_jolly', 'j_mime' },
+                consumeables = { 'c_sun' },
+                dollars = 25 - (3 + 3 + 3 + 5) - (5) - (3),
             }},
             { action = 'Exit_Shop' },
             { action = 'Select_Blind', args = 'big' },
+            { action = 'Destroy_Deck' },
+            { action = 'Destroy_Hand' },
+            { action = 'Create_Cards', args = {
+                hand = {'H_K','S_3','H_8','S_A','S_8'},
+            }},
+            { action = 'Select_Cards_From_Hand', args = { 2, 4, 5 }},
+            { action = 'Use_Consumeable', args = { key = 'c_sun' }},
+            { action = 'Select_Cards_From_Hand', args = { 1, 2, 3, 4, 5 }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                jokers = { 'j_jolly', 'j_mime' },
+                consumeables = {},
+                score = (35 + (15 + 15) + (10 + 3 + 8 + 11 + 8)) * (4 + (2 + 2) + (8)), -- lvl 3 flush
+            }},
         }
     }
 }
