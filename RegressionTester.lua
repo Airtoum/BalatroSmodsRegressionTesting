@@ -91,44 +91,40 @@ function RegressionTester.actions.Select_Blind(test_context, args)
     return { loops = 10 }
 end
 
+function RegressionTester.destroy_cards_in_cardarea(test_context, cardarea_name, cardarea, args)
+    if not cardarea then
+        test_context.fail_and_stop('Test runner tried to destroy all cards in '.. cardarea_name .. ' but it did not exist')
+        return
+    end
+    for k, v in pairs(cardarea.cards) do
+        v:start_dissolve(nil)
+    end
+end
+
 function RegressionTester.actions.Destroy_All_Cards(test_context, args)
-    for k, v in pairs(G.jokers.cards) do
-        v:start_dissolve(nil)
-    end
-    for k, v in pairs(G.hand.cards) do
-        v:start_dissolve(nil)
-    end
-    for k, v in pairs(G.deck.cards) do
-        v:start_dissolve(nil)
-    end
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.jokers', G.jokers, args)
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.hand', G.hand, args)
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.deck', G.deck, args)
     return { loops = 0 }
 end
 
 function RegressionTester.actions.Destroy_Jokers(test_context, args)
-    for k, v in pairs(G.jokers.cards) do
-        v:start_dissolve(nil)
-    end
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.jokers', G.jokers, args)
     return { loops = 0 }
 end
 
 function RegressionTester.actions.Destroy_Consumeables(test_context, args)
-    for k, v in pairs(G.consumeables.cards) do
-        v:start_dissolve(nil)
-    end
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.consumeables', G.consumeables, args)
     return { loops = 0 }
 end
 
 function RegressionTester.actions.Destroy_Hand(test_context, args)
-    for k, v in pairs(G.hand.cards) do
-        v:start_dissolve(nil)
-    end
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.hand', G.hand, args)
     return { loops = 0 }
 end
 
 function RegressionTester.actions.Destroy_Deck(test_context, args)
-    for k, v in pairs(G.deck.cards) do
-        v:start_dissolve(nil)
-    end
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.deck', G.deck, args)
     return { loops = 0 }
 end
 
@@ -283,15 +279,9 @@ function RegressionTester.actions.Cash_Out(test_context, args)
 end
 
 function RegressionTester.actions.Destroy_Shop(test_context, args)
-    for k, v in pairs(G.shop_jokers.cards) do
-        v:start_dissolve(nil)
-    end
-    for k, v in pairs(G.shop_booster.cards) do
-        v:start_dissolve(nil)
-    end
-    for k, v in pairs(G.shop_vouchers.cards) do
-        v:start_dissolve(nil)
-    end
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.shop_jokers', G.shop_jokers, args)
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.shop_booster', G.shop_booster, args)
+    RegressionTester.destroy_cards_in_cardarea(test_context, 'G.shop_vouchers', G.shop_vouchers, args)
     return { loops = 0 }
 end
 
@@ -483,6 +473,7 @@ local function run_tests(mod_test_groups)
             failed = false,
             failure_reasons = {},
             finished = false,
+            skipped = false,
             expect_game_over = nil,
         }
         function test_context.fail(reason)
@@ -497,11 +488,16 @@ local function run_tests(mod_test_groups)
             test_context.fail(reason)
             test_context.done()
         end
+        function test_context.skip()
+            test_context.finished = true
+            test_context.skipped = true
+        end
         local original_g_funcs_hud_blind_debuff = G.FUNCS.HUD_blind_debuff
         G.E_MANAGER:add_event(Event({
             no_delete = true,
             pause_force = true,
             func = function()
+                RegressionTester.current_test_context = test_context
                 G.FUNCS.HUD_blind_debuff = function() end
                 if G.STAGE == G.STAGES.MAIN_MENU then
                     G.forced_seed = (test.seed or RegressionTester.DEFAULT_REGRESSION_TEST_SEED)
@@ -545,6 +541,7 @@ local function run_tests(mod_test_groups)
                     test_context.done()
                 end
                 if test_context.finished then
+                    RegressionTester.current_test_context = nil
                     if (test_context.expect_game_over == true and not G.STATE == G.STATES.GAME_OVER) then
                         test_context.fail('Test expected a game over to happen, but no game over happened')
                     end
@@ -556,6 +553,8 @@ local function run_tests(mod_test_groups)
                                 sendWarnMessage('Failed: '.. test_context.name .. ': ' .. failure_reason, LOGGER_NAME)
                             end
                         end
+                    elseif test_context.skipped then
+                        sendWarnMessage('Skipped: '..test_context.name, LOGGER_NAME)
                     else
                         sendInfoMessage('Pass: '..test_context.name, LOGGER_NAME)
                     end
@@ -569,6 +568,15 @@ local function run_tests(mod_test_groups)
     for i = 1, #tests do
         queue_test(i)
     end
+
+    G.E_MANAGER:add_event(Event({
+        no_delete = true,
+        pause_force = true,
+        func = function()
+            RegressionTester.running = false
+            return true
+        end
+    }), REGRESSION_TEST_QUEUE_NAME)
 end
 
 local function run_all()
@@ -582,12 +590,38 @@ local function run_all()
     run_tests(mod_test_groups)
 end
 
+local function stop_tests()
+    for i, event in ipairs(G.E_MANAGER.queues[REGRESSION_TEST_QUEUE_NAME]) do
+        event.no_delete = false
+    end
+    G.E_MANAGER:clear_queue(REGRESSION_TEST_QUEUE_NAME)
+end
+
+RegressionTester.running = false
+RegressionTester.current_test_context = nil
+
 SMODS.Keybind {
     key_pressed = 'f7',
     event = 'pressed',
     action = function(self)
-        print('run tests')
-        run_all()
+        if not RegressionTester.running then
+            print('run tests')
+            RegressionTester.running = true
+            run_all()
+        else
+            stop_tests()
+            RegressionTester.running = false
+        end
+    end
+}
+
+SMODS.Keybind {
+    key_pressed = 'f8',
+    event = 'pressed',
+    action = function(self)
+        if RegressionTester.running and RegressionTester.current_test_context then
+            RegressionTester.current_test_context.skip()
+        end
     end
 }
 
