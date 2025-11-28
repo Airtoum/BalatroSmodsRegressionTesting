@@ -286,6 +286,151 @@ Vanilla.regression_tests = {
                 dollars = -19,
             }},
         }
+    },
+    {
+        name = 'Ceremonial Dagger',
+        actions = {
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_ceremonial', 'j_perkeo', 'j_mad', 'j_clever' },
+            }},
+            { action = 'Select_Blind', args = 'small' } ,
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Create_Cards', args = {
+                selected = {'C_9'},
+            }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                jokers = { 'j_ceremonial', 'j_mad', 'j_clever' },
+                score = (constants.HIGH_CARD_CHIPS + 9) * (constants.HIGH_CARD_MULT + 10 * 2),
+            }},
+            { action = 'Win_Blind' },
+            { action = 'Cash_Out' },
+            { action = 'Exit_Shop' },
+            { action = 'Select_Blind', args = 'big' } ,
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Create_Cards', args = {
+                selected = {'C_9'},
+            }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                jokers = { 'j_ceremonial', 'j_clever' },
+                score = (constants.HIGH_CARD_CHIPS + 9) * (constants.HIGH_CARD_MULT + 10 * 2 + 2 * 2),
+            }},
+        }
+    },
+    {
+        name = 'Banner',
+        actions = {
+            { action = 'Select_Blind', args = 'small' } ,
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Set_Hands', args = 6 },
+            { action = 'Set_Discards', args = 3 },
+            { action = 'Destroy_All_Cards' },
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_banner' },
+                hand = { 'C_4', 'C_4', 'C_4', 'C_4', 'C_4', 'C_4', 'C_4' },
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 3) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Discard' },
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 3) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 2) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Discard' },
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 3) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 2) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 1) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Discard' },
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 3) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 2) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4 + 30 * 1) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+        }
+    },
+    {
+        name = 'Mystic Summit',
+        actions = {
+            { action = 'Select_Blind', args = 'small' } ,
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Set_Hands', args = 6 },
+            { action = 'Set_Discards', args = 3 },
+            { action = 'Destroy_All_Cards' },
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_mystic_summit' },
+                hand = { 'C_4', 'C_4', 'C_4', 'C_4', 'C_4', 'C_4', 'C_4' },
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Discard' },
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Discard' },
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT)
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Discard' },
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT) +
+                    (constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 15)
+                ),
+            }},
+        }
+    },
+    {
+        name = 'Marble Joker',
+        actions = {
+            { action = 'Select_Blind', args = 'small' } ,
+        }
     }
 }
 
