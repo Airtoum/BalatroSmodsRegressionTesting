@@ -241,7 +241,7 @@ Vanilla.regression_tests = {
     {
         name = 'Mime',
         actions = {
-            { action = 'Select_Blind', args = 'small'},
+            { action = 'Select_Blind', args = 'small' },
             { action = 'Set_Blind_Chips', args = 1 },
             { action = 'Set_Money', args = 0 },
             { action = 'Destroy_All_Cards' },
@@ -264,6 +264,28 @@ Vanilla.regression_tests = {
                 dollars = 1 * 2 * 3 + 3 * 2,
             }},
         },
+    },
+    {
+        name = 'Credit Card',
+        actions = {
+            { action = 'Select_Blind', args = 'small'} ,
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_credit_card' },
+            }},
+            { action = 'Win_Blind' },
+            { action = 'Cash_Out' },
+            { action = 'Set_Money', args = 11 },
+            { action = 'Create_Shop', args = {
+                jokers = {'j_blueprint', 'j_brainstorm', 'j_perkeo'},
+            }},
+            { action = 'Buy_From_Shop', args = { key = 'j_blueprint' } },
+            { action = 'Buy_From_Shop', args = { key = 'j_perkeo' } },
+            { action = 'Buy_From_Shop', args = { key = 'j_brainstorm' } },
+            { action = 'Expect', args = {
+                jokers = { 'j_credit_card', 'j_blueprint', 'j_perkeo' },
+                dollars = -19,
+            }},
+        }
     }
 }
 
