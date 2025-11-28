@@ -12,7 +12,7 @@ local RegressionTester = SMODS.current_mod
 
 local REGRESSION_TEST_QUEUE_NAME = 'regression_tests'
 local LOGGER_NAME = 'RegressionTester'
-RegressionTester.DEFAULT_REGRESSION_TEST_SEED = 'RegressionTests'
+RegressionTester.DEFAULT_REGRESSION_TEST_SEED = 'Regression-Tester'
 
 RegressionTester.actions = {}
 
@@ -20,7 +20,7 @@ local function string_join(t, delimiter)
     local string_acc = ''
     for i, v in ipairs(t) do
         if i > 1 then
-            string_acc = delimiter .. string_acc
+            string_acc = string_acc .. delimiter
         end
         string_acc = string_acc .. tostring(v)
     end
@@ -131,12 +131,18 @@ end
 function RegressionTester.actions.Create_Cards(test_context, args)
     args = args or {}
     args.jokers = args.jokers or {}
+    args.consumeables = args.consumeables or {}
     args.selected = args.selected or {}
     args.hand = args.hand or {}
     for i, joker_key in ipairs(args.jokers) do
         local card = create_card('Joker', G.jokers, nil, 0, true, nil, joker_key)
         card:add_to_deck()
         G.jokers:emplace(card)
+    end
+    for i, consumeable_key in ipairs(args.consumeables) do
+        local card = create_card(nil, G.consumeables, nil, 0, true, nil, consumeable_key)
+        card:add_to_deck()
+        G.consumeables:emplace(card)
     end
     for i, key in ipairs(args.selected) do
         local card = create_playing_card({
@@ -157,7 +163,7 @@ function RegressionTester.actions.Play_Hand(test_context, args)
         sendWarnMessage('Test Runner is playing a hand with 0 cards selected (this may crash, unless a mod supports this)', LOGGER_NAME)
     end
     G.FUNCS.play_cards_from_highlighted()
-    return { loops = 3 }
+    return { loops = 6 }
 end
 
 function RegressionTester.actions.Discard(test_context, args)
@@ -251,6 +257,34 @@ end
 
 function RegressionTester.actions.Add_Money(test_context, args)
     ease_dollars(args or 0, true)
+    return { loops = 1 }
+end
+
+function RegressionTester.actions.Set_Hands(test_context, args)
+    if not G or not G.GAME or not G.GAME.current_round or not G.GAME.current_round.hands_left then
+        sendWarnMessage('Test runner tried to set hands but the required objects did not exist')
+        return
+    end
+    ease_hands_played(-G.GAME.current_round.hands_left + args or 0, true)
+    return { loops = 1 }
+end
+
+function RegressionTester.actions.Add_Hands(test_context, args)
+    ease_hands_played(args or 0, true)
+    return { loops = 1 }
+end
+
+function RegressionTester.actions.Set_Discards(test_context, args)
+    if not G or not G.GAME or not G.GAME.current_round or not G.GAME.current_round.hands_left then
+        sendWarnMessage('Test runner tried to set discards but the required objects did not exist')
+        return
+    end
+    ease_discard(-G.GAME.current_round.discards_left + args or 0, true)
+    return { loops = 1 }
+end
+
+function RegressionTester.actions.Add_Discards(test_context, args)
+    ease_discard(args or 0, true)
     return { loops = 1 }
 end
 
@@ -400,6 +434,10 @@ end
 function RegressionTester.actions.Use_Consumeable(test_context, args)
     local index = RegressionTester.find_card_in_cardarea(test_context, 'consumeables', G.consumeables, args)
     local consumeable = G.consumeables.cards[index]
+    if not consumeable then
+        test_context.fail_and_stop('Test runner found no consumeable '..(args.index or args.key or '1') .. ' to use')
+        return
+    end
     if not consumeable.highlighted then
         RegressionTester.actions.Select_Consumeable(test_context, args)
     end
@@ -414,6 +452,81 @@ function RegressionTester.actions.Select_Cards_From_Hand(test_context, args)
         RegressionTester.select_card(test_context, 'hand', G.hand, subarg)
     end
     return { loops = 2 }
+end
+
+function RegressionTester.actions.Set_Blind_Chips(test_context, args)
+    if not G or not G.GAME or not G.GAME.blind then
+        sendWarnMessage('Test runner tried to set chips on blind and could not find current blind', LOGGER_NAME)
+        return { loops = 0 }
+    end
+    G.GAME.blind.chips = args
+    G.GAME.blind.chip_text = number_format(G.GAME.blind.chips)
+    return { loops = 0 }
+end
+
+function RegressionTester.swap_cards_in_cardarea(test_context, cardarea_name, cardarea, swaperand_a, swaperand_b)
+    local index_a = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, swaperand_a)
+    local index_b = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, swaperand_b)
+    cardarea.cards[index_a], cardarea.cards[index_b] = cardarea.cards[index_b], cardarea.cards[index_a]
+    return { loops = 0 }
+end
+
+function RegressionTester.move_card_to_left_in_cardarea(test_context, cardarea_name, cardarea, args)
+    local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
+    while index > 1 do
+        cardarea.cards[index], cardarea.cards[index - 1] = cardarea.cards[index - 1], cardarea.cards[index]
+        index = index - 1
+    end
+    return { loops = 0 }
+end
+
+function RegressionTester.move_card_to_right_in_cardarea(test_context, cardarea_name, cardarea, args)
+    local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
+    while index < #cardarea.cards do
+        cardarea.cards[index], cardarea.cards[index + 1] = cardarea.cards[index + 1], cardarea.cards[index]
+        index = index + 1
+    end
+    return { loops = 0 }
+end
+
+function RegressionTester.actions.Swap_Jokers(test_context, args)
+    return RegressionTester.swap_cards_in_cardarea(test_context, 'jokers', G.jokers, args[1], args[2])
+end
+
+function RegressionTester.actions.Move_Joker_To_Left(test_context, args)
+    return RegressionTester.move_card_to_left_in_cardarea(test_context, 'jokers', G.jokers, args)
+end
+
+function RegressionTester.actions.Move_Joker_To_Right(test_context, args)
+    return RegressionTester.move_card_to_right_in_cardarea(test_context, 'jokers', G.jokers, args)
+end
+
+function RegressionTester.actions.Swap_Consumeables(test_context, args)
+    return RegressionTester.swap_cards_in_cardarea(test_context, 'consumeables', G.consumeables, args[1], args[2])
+end
+
+function RegressionTester.actions.Move_Consumeable_To_Left(test_context, args)
+    return RegressionTester.move_card_to_left_in_cardarea(test_context, 'consumeables', G.consumeables, args)
+end
+
+function RegressionTester.actions.Move_Consumeable_To_Right(test_context, args)
+    return RegressionTester.move_card_to_right_in_cardarea(test_context, 'consumeables', G.consumeables, args)
+end
+
+function RegressionTester.actions.Swap_Cards_In_Hand(test_context, args)
+    return RegressionTester.swap_cards_in_cardarea(test_context, 'hand', G.hand, args[1], args[2])
+end
+
+function RegressionTester.actions.Move_Card_In_Hand_To_Left(test_context, args)
+    return RegressionTester.move_card_to_left_in_cardarea(test_context, 'hand', G.hand, args)
+end
+
+function RegressionTester.actions.Move_Card_In_Hand_To_Right(test_context, args)
+    return RegressionTester.move_card_to_right_in_cardarea(test_context, 'hand', G.hand, args)
+end
+
+function RegressionTester.actions.Custom(test_context, args)
+    return args(test_context)
 end
 
 local function run_test(test, mod_context, test_context)
@@ -435,7 +548,7 @@ local function run_test(test, mod_context, test_context)
         -- sendInfoMessage(test_context.name..': '..((missing_action and instruction.action) or action), LOGGER_NAME)
         print(test_context.name..': '..((missing_action and instruction.action) or action))
         local action_function = RegressionTester.actions[action]
-        local args = (missing_action and instruction.action) or (instruction and instruction.args)
+        local args = (missing_action and instruction.action) or (instruction and instruction.args or instruction[1])
         local action_result = action_function(test_context, args)
         local loops = (action_result and action_result.loops) or 0
         if not instructions[instruction_number + 1] then
@@ -443,6 +556,13 @@ local function run_test(test, mod_context, test_context)
         end
         if not test_context.finished then
             instruction_number = instruction_number + 1
+            if (RegressionTester.slow) then
+                if loops == 0 then
+                    delay(RegressionTester.slow_wait / G.SETTINGS.GAMESPEED)
+                else
+                    enqueue_with_depth(loops - 1, function() delay(RegressionTester.slow_wait / G.SETTINGS.GAMESPEED) end)
+                end
+            end
             enqueue_with_depth(loops, queue_next_instruction)
         end
     end
@@ -493,12 +613,16 @@ local function run_tests(mod_test_groups)
             test_context.skipped = true
         end
         local original_g_funcs_hud_blind_debuff = G.FUNCS.HUD_blind_debuff
+        local original_g_funcs_wipe_on = G.FUNCS.wipe_on
+        local original_g_funcs_wipe_off = G.FUNCS.wipe_off
         G.E_MANAGER:add_event(Event({
             no_delete = true,
             pause_force = true,
             func = function()
                 RegressionTester.current_test_context = test_context
                 G.FUNCS.HUD_blind_debuff = function() end
+                G.FUNCS.wipe_on = function() end
+                G.FUNCS.wipe_off = function() end
                 if G.STAGE == G.STAGES.MAIN_MENU then
                     G.forced_seed = (test.seed or RegressionTester.DEFAULT_REGRESSION_TEST_SEED)
                     G.FUNCS.start_setup_run()
@@ -525,6 +649,10 @@ local function run_tests(mod_test_groups)
             pause_force = true,
             func = function()
                 G.FUNCS.HUD_blind_debuff = original_g_funcs_hud_blind_debuff
+                G.FUNCS.wipe_on = original_g_funcs_wipe_on
+                G.FUNCS.wipe_off = original_g_funcs_wipe_off
+                G.E_MANAGER.queue_timer = G.E_MANAGER.queue_timer + 10
+                G.TIMERS.REAL = G.TIMERS.REAL + 10
                 run_test(test, test.mod_test_group, test_context)
                 return true
             end,
@@ -587,6 +715,9 @@ local function run_all()
             table.insert(mod_test_groups, { tests = mod.regression_tests, mod = mod, mod_key = key})
         end
     end
+    if RegressionTester.Vanilla.regression_tests then
+        table.insert(mod_test_groups, { tests = RegressionTester.Vanilla.regression_tests, mod = RegressionTester.Vanilla, mod_key = 'VanillaTests'})
+    end
     run_tests(mod_test_groups)
 end
 
@@ -599,6 +730,8 @@ end
 
 RegressionTester.running = false
 RegressionTester.current_test_context = nil
+RegressionTester.slow = false
+RegressionTester.slow_wait = 1
 
 SMODS.Keybind {
     key_pressed = 'f7',
@@ -623,6 +756,102 @@ SMODS.Keybind {
             RegressionTester.current_test_context.skip()
         end
     end
+}
+
+SMODS.Keybind {
+    key_pressed = 'f9',
+    event = 'pressed',
+    action = function(self)
+        RegressionTester.slow = not RegressionTester.slow
+        print('RegressionTester slow is ' .. tostring(RegressionTester.slow))
+    end
+}
+
+
+-- These are here for convenience.
+RegressionTester.constants = {
+    HIGH_CARD_CHIPS = 5,
+    HIGH_CARD_MULT = 1,
+    PAIR_CHIPS = 10,
+    PAIR_MULT = 2,
+    TWO_PAIR_CHIPS = 20,
+    TWO_PAIR_MULT = 2,
+    THREE_OF_A_KIND_CHIPS = 30,
+    THREE_OF_A_KIND_MULT = 3,
+    STRAIGHT_CHIPS = 30,
+    STRAIGHT_MULT = 4,
+    FLUSH_CHIPS = 35,
+    FLUSH_MULT = 4,
+    FULL_HOUSE_CHIPS = 40,
+    FULL_HOUSE_MULT = 4,
+    FOUR_OF_A_KIND_CHIPS = 60,
+    FOUR_OF_A_KIND_MULT = 7,
+    STRAIGHT_FLUSH_CHIPS = 100,
+    STRAIGHT_FLUSH_MULT = 8,
+    FIVE_OF_A_KIND_CHIPS = 120,
+    FIVE_OF_A_KIND_MULT = 12,
+    FLUSH_HOUSE_CHIPS = 140,
+    FLUSH_HOUSE_MULT = 14,
+    FLUSH_FIVE_CHIPS = 160,
+    FLUSH_FIVE_MULT = 16,
+
+    MERCURY_CHIPS = 15,
+    MERCURY_MULT = 1,
+    VENUS_CHIPS = 20,
+    VENUS_MULT = 2,
+    EARTH_CHIPS = 25,
+    EARTH_MULT = 2,
+    MARS_CHIPS = 30,
+    MARS_MULT = 3,
+    JUPITER_CHIPS = 15,
+    JUPITER_MULT = 2,
+    SATURN_CHIPS = 30,
+    SATURN_MULT = 3,
+    URANUS_CHIPS = 20,
+    URANUS_MULT = 1,
+    NEPTUNE_CHIPS = 40,
+    NEPTUNE_MULT = 4,
+    PLUTO_CHIPS = 10,
+    PLUTO_MULT = 1,
+    PLANET_X_CHIPS = 35,
+    PLANET_X_MULT = 3,
+    CERES_CHIPS = 40,
+    CERES_MULT = 4,
+    ERIS_CHIPS = 50,
+    ERIS_MULT = 3,
+
+    BONUS_CARD_CHIPS = 30,
+    MULT_CARD_MULT = 4,
+    GLASS_CARD_XMULT = 2,
+    STEEL_CARD_XMULT = 1.5,
+    STONE_CARD_CHIPS = 50,
+    GOLD_CARD_DOLLARS = 3,
+    LUCKY_CARD_MULT = 20,
+    LUCKY_CARD_ODDS_MULT = 5,
+    LUCKY_CARD_DOLLARS = 20,
+    LUCKY_CARD_ODDS_DOLLARS = 15,
+
+    FOIL_CHIPS = 50,
+    HOLOGRAPHIC_MULT = 10,
+    POLYCHROME_XMULT = 1.5,
+
+    GOLD_SEAL_DOLLARS = 3,
+
+    MAGICIAN_SELECT = 2,
+    EMPRESS_SELECT = 2,
+    HEIROPHANT_SELECT = 2,
+    LOVERS_SELECT = 1,
+    CHARIOT_SELECT = 1,
+    JUSTICE_SELECT = 1,
+    STRENGTH_SELECT = 2,
+    HANGED_MAN_SELECT = 2,
+    DEATH_SELECT = 2,
+    DEVIL_SELECT = 1,
+    TOWER_SELECT = 1,
+    STAR_SELECT = 3,
+    MOON_SELECT = 3,
+    SUN_SELECT = 3,
+    WORLD_SELECT = 3,
 }
 
 RegressionTester.regression_tests = {
@@ -797,5 +1026,31 @@ RegressionTester.regression_tests = {
                 score = (35 + (15 + 15) + (10 + 3 + 8 + 11 + 8)) * (4 + (2 + 2) + (8)), -- lvl 3 flush
             }},
         }
+    }, 
+    [9] = {
+        name = 'Roll No Editions',
+        actions = {
+            { action = 'Custom', args = function(test_context)
+                for i = 1, 25 do
+                    if poll_edition('edi1') then
+                        test_context.fail('Default regression test seed has an edition within the first 25 spawned jokers, (at '..tostring(i)..')')
+                    end
+                end
+                for i = 1, 25 do
+                    if poll_edition('edisho1') then
+                        test_context.fail('Default regression test seed has an edition within the first 25 shop jokers, (at '..tostring(i)..')')
+                    end
+                end
+                if test_context.failed then
+                    test_context.done()
+                end
+                return { loops = 0 }
+            end }
+        }
     }
 }
+
+local vanilla_tests, err = SMODS.load_file("vanilla-tests.lua", 'RegressionTester')
+if err then error(err) end
+vanilla_tests()
+
