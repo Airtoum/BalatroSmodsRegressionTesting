@@ -582,7 +582,7 @@ function RegressionTester.actions.Custom(test_context, args)
     return args(test_context)
 end
 
-RegressionTester.pause_force_actions = { 
+RegressionTester.meta_actions = { 
     ['Noop'] = true,
     ['Loop'] = true,
     ['Expect'] = true,
@@ -606,8 +606,12 @@ local function run_test(test, mod_context, test_context)
         end
         instruction.action_function = RegressionTester.actions[instruction.action]
         instruction.args = instruction.args or instruction[1] or nil
-        if RegressionTester.pause_force_actions[instruction.action] then
-            instruction.pause_force = true
+        if RegressionTester.meta_actions[instruction.action] then
+            instruction.meta = true
+        end
+        instruction.execute = function()
+            print(test_context.name..': '..(instruction.action == 'Missing_Action' and instruction.args or instruction.action))
+            return instruction.action_function(test_context, instruction.args)
         end
         table.insert(instructions, instruction)
     end
@@ -617,8 +621,7 @@ local function run_test(test, mod_context, test_context)
     test_context.instruction_number = 1
     local function queue_next_instruction()
         local instruction = instructions[test_context.instruction_number] 
-        print(test_context.name..': '..(instruction.action == 'Missing_Action' and instruction.args or instruction.action))
-        local action_result = instruction.action_function(test_context, instruction.args)
+        local action_result = instruction.execute()
         local loops = (action_result and action_result.loops) or 0
         local wait_until = (action_result and action_result.wait_until) or constant_function(true)
         if not instructions[test_context.instruction_number + 1] then
@@ -627,10 +630,6 @@ local function run_test(test, mod_context, test_context)
         if not test_context.finished then
             test_context.instruction_number = test_context.instruction_number + 1
             local enqueue_extra = {}
-            -- if instruction.pause_force then
-            --     enqueue_extra.pause_force = true
-            --     enqueue_extra.regression_test_event = true
-            -- end
             if (RegressionTester.slow) then
                 if loops == 0 then
                     delay_with_extra(RegressionTester.slow_wait / G.SETTINGS.GAMESPEED, nil, enqueue_extra)
@@ -690,14 +689,14 @@ local function run_tests(mod_test_groups)
             test_context.skipped = true
         end
         function test_context.will_finish_through_pause()
-            local found_paused_instruction = false
+            local found_non_meta_instruction = false
             for i = test_context.instruction_number, #test_context.instructions do
-                if not test_context.instructions[i].pause_force then
-                    found_paused_instruction = true
+                if not test_context.instructions[i].meta then
+                    found_non_meta_instruction = true
                     break
                 end
             end
-            return not found_paused_instruction
+            return not found_non_meta_instruction
         end
         local original_g_funcs_hud_blind_debuff = G.FUNCS.HUD_blind_debuff
         local original_g_funcs_wipe_on = G.FUNCS.wipe_on
@@ -755,6 +754,11 @@ local function run_tests(mod_test_groups)
                     end
                     if (not test_context.finished) then
                         if test_context.will_finish_through_pause() then
+                            for i = test_context.instruction_number, #test_context.instructions do
+                                local instruction = test_context.instructions[i]
+                                instruction.execute()
+                            end
+                            test_context.done()
                             -- a nicer solution is to just do the instructions in a new queue, creating new events and ignoring the existing ones
                             -- for i, event in ipairs(G.E_MANAGER.queues.base) do
                             --     if event.regression_test_event then
@@ -762,7 +766,6 @@ local function run_tests(mod_test_groups)
                             --         break
                             --     end
                             -- end
-                            G.SETTINGS.paused = false
                             return false
                         end
                         test_context.fail('Test had a game over before completing all of its instructions')
