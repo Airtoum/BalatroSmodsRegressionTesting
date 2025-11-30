@@ -429,7 +429,29 @@ Vanilla.regression_tests = {
     {
         name = 'Marble Joker',
         actions = {
+            { action = 'Expect_Game_Over_By_End', args = false },
+            { action = 'Destroy_All_Cards' } ,
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_marble' },
+            }},
             { action = 'Select_Blind', args = 'small' } ,
+            { action = 'Set_Blind_Chips', args = 1 },
+            { action = 'Select_Cards_From_Hand', args = { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (constants.HIGH_CARD_CHIPS + 50) * (constants.HIGH_CARD_MULT),
+            }},
+            { action = 'Cash_Out' },
+            { action = 'Exit_Shop' },
+            { action = 'Select_Blind', args = 'big' } ,
+            { action = 'Set_Blind_Chips', args = 1 },
+            { action = 'Select_Cards_From_Hand', args = { 1, 2 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (constants.HIGH_CARD_CHIPS + 50 + 50) * (constants.HIGH_CARD_MULT),
+            }},
+            { action = 'Cash_Out' },
+            { action = 'Exit_Shop' },
         }
     }
 }

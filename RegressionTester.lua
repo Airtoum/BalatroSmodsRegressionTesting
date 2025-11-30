@@ -16,6 +16,12 @@ RegressionTester.DEFAULT_REGRESSION_TEST_SEED = 'Regression-Tester'
 
 RegressionTester.actions = {}
 
+local function constant_function(constant)
+    return function()
+        return constant
+    end
+end
+
 local function string_join(t, delimiter)
     local string_acc = ''
     for i, v in ipairs(t) do
@@ -72,6 +78,29 @@ local function with_patience(patience, ready_fn, fn, out_of_patience_fn)
     end)
 end
 
+local function requeue_until_unlocked(loops, fn, extra, queue, wait_until)
+    extra = extra or {}
+    queue = queue or nil
+    wait_until = wait_until or constant_function(true)
+    if loops == 0 then
+        fn()
+        return
+    end
+    G.E_MANAGER:add_event(Event({
+        func = function()
+            local locked = (G.CONTROLLER.locked) or (G.GAME.STOP_USE and G.GAME.STOP_USE > 0) or G.STATE_COMPLETE or not wait_until()
+            if locked or loops > 0 then
+                requeue_until_unlocked(math.max(loops - 1, 0), fn, extra, queue, wait_until)
+            else
+                fn()
+            end
+            return true
+        end,
+        no_delete = extra.no_delete,
+        pause_force = extra.pause_force,
+    }), queue)
+end
+
 function RegressionTester.actions.Noop(test_context, args)
     return { loops = 0 }
 end
@@ -107,7 +136,12 @@ function RegressionTester.actions.Select_Blind(test_context, args)
         end,
         function () test_context.fail_and_stop('Test runner could not find "Select Blind button."') end
         )
-    return { loops = 10 }
+    return { 
+        loops = 10, 
+        wait_until = function()
+            return G.STATE == G.STATES.SELECTING_HAND
+        end,
+    } 
 end
 
 function RegressionTester.destroy_cards_in_cardarea(test_context, cardarea_name, cardarea, args)
@@ -328,7 +362,7 @@ function RegressionTester.actions.Cash_Out(test_context, args)
     enqueue_with_depth(4, function ()
         G.FUNCS.cash_out({config = {}})
     end)
-    return { loops = 4 + 6 }
+    return { loops = 4 + 9 }
 end
 
 function RegressionTester.actions.Destroy_Shop(test_context, args)
@@ -552,6 +586,7 @@ RegressionTester.pause_force_actions = {
     ['Noop'] = true,
     ['Loop'] = true,
     ['Expect'] = true,
+    ['Expect_Game_Over_By_End'] = true,
     ['Fail'] = true,
 }
 
@@ -585,16 +620,17 @@ local function run_test(test, mod_context, test_context)
         print(test_context.name..': '..(instruction.action == 'Missing_Action' and instruction.args or instruction.action))
         local action_result = instruction.action_function(test_context, instruction.args)
         local loops = (action_result and action_result.loops) or 0
+        local wait_until = (action_result and action_result.wait_until) or constant_function(true)
         if not instructions[test_context.instruction_number + 1] then
             test_context.done()
         end
         if not test_context.finished then
             test_context.instruction_number = test_context.instruction_number + 1
             local enqueue_extra = {}
-            if instruction.pause_force then
-                enqueue_extra.pause_force = true
-                enqueue_extra.regression_test_event = true
-            end
+            -- if instruction.pause_force then
+            --     enqueue_extra.pause_force = true
+            --     enqueue_extra.regression_test_event = true
+            -- end
             if (RegressionTester.slow) then
                 if loops == 0 then
                     delay_with_extra(RegressionTester.slow_wait / G.SETTINGS.GAMESPEED, nil, enqueue_extra)
@@ -602,7 +638,7 @@ local function run_test(test, mod_context, test_context)
                     enqueue_with_depth(loops - 1, function() delay_with_extra(RegressionTester.slow_wait / G.SETTINGS.GAMESPEED, nil, enqueue_extra) end, enqueue_extra)
                 end
             end
-            enqueue_with_depth(loops, queue_next_instruction, enqueue_extra)
+            requeue_until_unlocked(loops, queue_next_instruction, enqueue_extra, nil, wait_until)
         end
     end
 
@@ -715,17 +751,17 @@ local function run_tests(mod_test_groups)
             func = function()
                 if G.STATE == G.STATES.GAME_OVER then
                     if (test_context.expect_game_over == false) then
-                        test_context.fail('Test expected no game over to happen, but a game over happened')
+                        test_context.fail_and_stop('Test expected no game over to happen, but a game over happened')
                     end
                     if (not test_context.finished) then
                         if test_context.will_finish_through_pause() then
                             -- a nicer solution is to just do the instructions in a new queue, creating new events and ignoring the existing ones
-                            for i, event in ipairs(G.E_MANAGER.queues.base) do
-                                if event.regression_test_event then
-                                    event.blockable = false
-                                    break
-                                end
-                            end
+                            -- for i, event in ipairs(G.E_MANAGER.queues.base) do
+                            --     if event.regression_test_event then
+                            --         event.blockable = false
+                            --         break
+                            --     end
+                            -- end
                             G.SETTINGS.paused = false
                             return false
                         end
