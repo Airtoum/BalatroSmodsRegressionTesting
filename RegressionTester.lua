@@ -88,9 +88,10 @@ local function requeue_until_unlocked(loops, fn, extra, queue, wait_until)
     end
     G.E_MANAGER:add_event(Event({
         func = function()
-            local locked = (G.CONTROLLER.locked) or (G.GAME.STOP_USE and G.GAME.STOP_USE > 0) or G.STATE_COMPLETE or not wait_until()
+            local locked = (G.CONTROLLER.locked) or (G.GAME.STOP_USE and G.GAME.STOP_USE > 0) or not G.STATE_COMPLETE or not wait_until()
             if locked or loops > 0 then
-                requeue_until_unlocked(math.max(loops - 1, 0), fn, extra, queue, wait_until)
+                local next_loops = locked and loops or loops - 1
+                requeue_until_unlocked(math.max(next_loops, 0), fn, extra, queue, wait_until)
             else
                 fn()
             end
@@ -139,7 +140,11 @@ function RegressionTester.actions.Select_Blind(test_context, args)
     return { 
         loops = 10, 
         wait_until = function()
-            return G.STATE == G.STATES.SELECTING_HAND
+            local cards_have_been_drawn = (
+                (G and G.hand and G.hand.config and G.hand.config.card_limit and G.hand.cards[G.hand.config.card_limit]) or 
+                (G and G.deck and G.deck.cards and #G.deck.cards == 0)
+            )
+            return G.STATE == G.STATES.SELECTING_HAND and cards_have_been_drawn
         end,
     } 
 end
@@ -362,7 +367,12 @@ function RegressionTester.actions.Cash_Out(test_context, args)
     enqueue_with_depth(4, function ()
         G.FUNCS.cash_out({config = {}})
     end)
-    return { loops = 4 + 9 }
+    return {
+        loops = 4 + 9,
+        wait_until = function()
+            return G.shop ~= nil and G.shop_jokers ~= nil
+        end
+    }
 end
 
 function RegressionTester.actions.Destroy_Shop(test_context, args)
@@ -472,6 +482,10 @@ end
 
 function RegressionTester.select_card(test_context, cardarea_name, cardarea, args)
     local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
+    if not cardarea.cards[index] then
+        test_context.fail_and_stop('Test runner could not find the card to select')
+        return
+    end
     cardarea:add_to_highlighted(cardarea.cards[index])
     return { loops = 2 }
 end

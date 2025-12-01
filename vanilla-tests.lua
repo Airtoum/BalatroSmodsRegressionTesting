@@ -453,7 +453,128 @@ Vanilla.regression_tests = {
             { action = 'Cash_Out' },
             { action = 'Exit_Shop' },
         }
-    }
+    },
+    {
+        name = 'Loyalty Card',
+        actions = {
+            { action = 'Select_Blind', args = 'small' },
+            { action = 'Set_Blind_Chips', args = (
+                ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 7 +
+                ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 1
+            ) },
+            { action = 'Set_Hands', args = 8 },
+            { action = 'Destroy_All_Cards' },
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_joker', 'j_loyalty_card' },
+                hand = { 'D_4', 'S_4', 'S_4', 'D_4', 'S_4', 'D_4', 'D_4', 'S_4' },
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 1 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 2 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 3 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 4 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 5 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 5 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 1
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 6 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 1
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 7 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 1
+                ),
+            }},
+            { action = 'Cash_Out' },
+            { action = 'Exit_Shop' },
+            { action = 'Select_Blind', args = 'big' },
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Set_Hands', args = 8 },
+            { action = 'Destroy_Hand' },
+            { action = 'Create_Cards', args = {
+                hand = { 'D_4', 'S_4', 'S_4', 'D_4', 'S_4', 'D_4', 'D_4', 'S_4' },
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 1 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 2 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 3 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 0
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', { 1 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4))     * 3 +
+                    ((constants.HIGH_CARD_CHIPS + 4) * (constants.HIGH_CARD_MULT + 4) * 4) * 1
+                ),
+            }},
+        },
+    },
 }
 
 
