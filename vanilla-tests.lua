@@ -601,7 +601,132 @@ Vanilla.regression_tests = {
                 number_of_consumeables = 1,
             }},
         },
-    }
+    },
+    {
+        name = 'Misprint',
+        seed = 'INTMISPR',
+        actions = {
+            { action = 'Select_Blind', args = 'small' },
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_misprint' },
+                selected = { 'H_7' },
+            }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (constants.HIGH_CARD_CHIPS + 7) * (constants.HIGH_CARD_MULT + 14)
+            }},
+            { action = 'Create_Cards', args = {
+                selected = { 'S_7' },
+            }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.HIGH_CARD_CHIPS + 7) * (constants.HIGH_CARD_MULT + 14) +
+                    (constants.HIGH_CARD_CHIPS + 7) * (constants.HIGH_CARD_MULT + 2)
+                )
+            }}
+        },
+    },
+    {
+        name = 'Dusk',
+        actions = {
+            { action = 'Select_Blind', args = 'small' },
+            { action = 'Set_Blind_Chips', args = (
+                (constants.FLUSH_CHIPS + 2 + (3 + 30) + 8 + 7 + 10) * ((constants.FLUSH_MULT + 3 + 3) * 2 + 3 + 3 + 3) +
+                (constants.FLUSH_CHIPS + (2 + 2) + (3 + 30 + 3 + 30) + (8 + 8) + (7 + 7) + (10 + 10)) * ((constants.FLUSH_MULT + (3 + 3) + (3 + 3)) * 2 * 2 + (3 + 3) + (3 + 3) + (3 + 3))
+            ) },
+            { action = 'Set_Hands', args = 2 },
+            { action = 'Set_Money', args = 0 },
+            { action = 'Destroy_Hand' },
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_dusk', 'j_wrathful_joker', 'j_ticket', 'j_8_ball', 'j_oops', 'j_oops' },
+                hand = { 'S_2', 'S_3', 'S_8', 'S_7', 'S_Q', 'S_2', 'S_3', 'S_8', 'S_7', 'S_Q' },
+                consumeables = { 'c_talisman', 'c_heirophant', 'c_justice', 'c_devil', 'c_talisman', 'c_justice', 'c_devil' },
+            }},
+            { action = 'Select_Cards_From_Hand', args = { 1 } },
+            { action = 'Use_Consumeable', { key = 'c_talisman' }},
+            { action = 'Select_Cards_From_Hand', args = { 6 } },
+            { action = 'Use_Consumeable', { key = 'c_talisman' }},
+            { action = 'Select_Cards_From_Hand', args = { 2, 7 } },
+            { action = 'Use_Consumeable', { key = 'c_heirophant' }},
+            { action = 'Select_Cards_From_Hand', args = { 3 } },
+            { action = 'Use_Consumeable', { key = 'c_justice' }},
+            { action = 'Select_Cards_From_Hand', args = { 8 } },
+            { action = 'Use_Consumeable', { key = 'c_justice' }},
+            { action = 'Select_Cards_From_Hand', args = { 4 } },
+            { action = 'Use_Consumeable', { key = 'c_devil' }},
+            { action = 'Select_Cards_From_Hand', args = { 9 } },
+            { action = 'Use_Consumeable', { key = 'c_devil' }},
+            { action = 'Select_Cards_From_Hand', args = { 1, 2, 3, 4, 5 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.FLUSH_CHIPS + 2 + (3 + 30) + 8 + 7 + 10) * ((constants.FLUSH_MULT + 3 + 3) * 2 + 3 + 3 + 3)
+                ),
+                number_of_consumeables = 1,
+                dollars = (
+                    3 + 4
+                ),
+            }},
+            { action = 'Select_Cards_From_Hand', args = { 1, 2, 3, 4, 5 } },
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (
+                    (constants.FLUSH_CHIPS + 2 + (3 + 30) + 8 + 7 + 10) * ((constants.FLUSH_MULT + 3 + 3) * 2 + 3 + 3 + 3) +
+                    (constants.FLUSH_CHIPS + (2 + 2) + (3 + 30 + 3 + 30) + (8 + 8) + (7 + 7) + (10 + 10)) * ((constants.FLUSH_MULT + (3 + 3) + (3 + 3)) * 2 * 2 + (3 + 3) + (3 + 3) + (3 + 3))
+                ),
+                number_of_consumeables = 2,
+                dollars = (
+                    3 + 4 +
+                    3 + 3 + 4 + 4
+                ),
+            }},
+        }
+    },
+    {
+        name = 'Raised Fist',
+        actions = {
+            { action = 'Select_Blind', args = 'small'},
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_raised_fist' },
+                selected = { 'C_K' },
+                hand = { 'D_8', 'S_6', 'H_J', 'H_7' },
+            }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (constants.HIGH_CARD_CHIPS + 10) * (constants.HIGH_CARD_MULT + (2 * 6)),
+            }}
+        }
+    },
+    {
+        name = 'Chaos the Clown',
+        actions = {
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_chaos' },
+            }},
+            { action = 'Select_Blind', args = 'small'},
+            { action = 'Win_Blind' },
+            { action = 'Cash_Out' },
+            { action = 'Set_Money', args = 720 },
+            { action = 'Reroll_Shop' },
+            { action = 'Expect', args = {
+                dollars = 720
+            }},
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_chaos' },
+            }},
+            { action = 'Select_Blind', args = 'big'},
+            { action = 'Win_Blind' },
+            { action = 'Cash_Out' },
+            { action = 'Set_Money', args = 720 },
+            { action = 'Reroll_Shop' },
+            { action = 'Reroll_Shop' },
+            { action = 'Expect', args = {
+                dollars = 720
+            }},
+        }
+    },
 }
 
 

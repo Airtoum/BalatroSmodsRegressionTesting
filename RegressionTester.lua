@@ -455,17 +455,15 @@ function RegressionTester.buy_from_shop_cardarea(test_context, cardarea_name, ca
         local button_key = args.buy_and_use and 'buy_and_use_button' or args.redeem and 'buy_button' or 'buy_button'
         local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
         if (
-            not G.shop_jokers or
-            not G.shop_jokers.cards or
-            not G.shop_jokers.cards[index] or
-            not G.shop_jokers.cards[index].children or
-            not G.shop_jokers.cards[index].children[button_key] or
-            not G.shop_jokers.cards[index].children[button_key].UIRoot or
-            not G.shop_jokers.cards[index].children[button_key].UIRoot.children or
-            not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1] or
-            not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1].click
+            not cardarea or
+            not cardarea.cards or
+            not cardarea.cards[index] or
             not cardarea.cards[index].children or
+            not cardarea.cards[index].children[button_key] or
+            not cardarea.cards[index].children[button_key].UIRoot or
             not cardarea.cards[index].children[button_key].UIRoot.children or
+            not cardarea.cards[index].children[button_key].UIRoot.children[1] or
+            not cardarea.cards[index].children[button_key].UIRoot.children[1].click
         ) then
             test_context.fail_and_stop('Test runner could not find the "'..button_key..'" for shop card '.. tostring(args.key or index))
         else
@@ -1208,26 +1206,3 @@ RegressionTester.regression_tests = {
 local vanilla_tests, err = SMODS.load_file("vanilla-tests.lua", 'RegressionTester')
 if err then error(err) end
 vanilla_tests()
-
-
-G.FUNCS.hand_chip_UI_set = function()
-    for k, v in pairs(G.STATES) do
-        if v == G.STATE then
-            G.GAME.current_round.current_hand.chip_text = k
-        end
-    end
-    e.config.object:update_text()
-end
-
-
-G.FUNCS.chip_UI_set = function(e)
-  local new_chips_text
-  for k, v in pairs(G.STATES) do
-        if v == G.STATE then
-            new_chips_text = k
-        end
-    end
-  if G.GAME.chips_text ~= new_chips_text then
-    G.GAME.chips_text = new_chips_text
-  end
-end
