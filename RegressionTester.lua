@@ -88,6 +88,9 @@ local function requeue_until_unlocked(loops, fn, extra, queue, wait_until)
     end
     G.E_MANAGER:add_event(Event({
         func = function()
+            if not RegressionTester.running then
+                return true
+            end
             local locked = (G.CONTROLLER.locked) or (G.GAME.STOP_USE and G.GAME.STOP_USE > 0) or not G.STATE_COMPLETE or not wait_until()
             if locked or loops > 0 then
                 local next_loops = locked and loops or loops - 1
@@ -143,7 +146,7 @@ function RegressionTester.actions.Select_Blind(test_context, args)
             local cards_have_been_drawn = (
                 (G and G.hand and G.hand.config and G.hand.config.card_limit and G.hand.cards[G.hand.config.card_limit]) or 
                 (G and G.deck and G.deck.cards and #G.deck.cards == 0)
-            )
+            ) and (not SMODS.cards_to_draw or SMODS.cards_to_draw == 0)
             return G.STATE == G.STATES.SELECTING_HAND and cards_have_been_drawn
         end,
     } 
@@ -192,6 +195,7 @@ function RegressionTester.actions.Create_Cards(test_context, args)
     args.consumeables = args.consumeables or {}
     args.selected = args.selected or {}
     args.hand = args.hand or {}
+    args.vouchers = args.vouchers or {}
     for i, joker_key in ipairs(args.jokers) do
         local card = create_card('Joker', G.jokers, nil, 0, true, nil, joker_key)
         card:add_to_deck()
@@ -212,6 +216,19 @@ function RegressionTester.actions.Create_Cards(test_context, args)
         local card = create_playing_card({
             front = G.P_CARDS[key]
         }, G.hand)
+    end
+    for i, voucher_key in ipairs(args.vouchers) do
+        local voucher_key = 'v_crystal_ball'
+        local card = create_card('Voucher', G.play, nil, 0, true, nil, voucher_key)
+        card:start_materialize()
+        G.play:emplace(card)
+        card.cost = 0
+        local current_state = G.STATE
+        card:redeem()
+        enqueue_with_depth(1, function ()
+            G.STATE = current_state
+            card:start_dissolve()
+        end)
     end
     return { loops = 3 }
 end
@@ -288,6 +305,13 @@ function RegressionTester.actions.Expect(test_context, args)
     if (args.consumeables) then
         RegressionTester.expect_card_keys_in_cardarea(test_context, 'Consumeables', G.consumeables, args.consumeables)
     end
+    if (args.number_of_jokers) then
+        RegressionTester.expect_equal(test_context, 'length of G.jokers.cards', #G.jokers.cards, args.number_of_jokers)
+    end
+    if (args.number_of_consumeables) then
+        RegressionTester.expect_equal(test_context, 'length of G.consumeables.cards', #G.consumeables.cards, args.number_of_consumeables)
+    end
+
     if (not args.continue_on_fail and test_context.failed) then
         test_context.done()
     end
@@ -425,13 +449,12 @@ function RegressionTester.find_card_in_cardarea(test_context, cardarea_name, car
 end
 
 -- todo: G.pack_cards
-function RegressionTester.actions.Buy_From_Shop(test_context, args)
+function RegressionTester.buy_from_shop_cardarea(test_context, cardarea_name, cardarea, args)
     enqueue_with_depth(1, function()
         args = args or {}
-        local button_key = args.buy_and_use and 'buy_and_use_button' or 'buy_button'
-        local index = RegressionTester.find_card_in_cardarea(test_context, 'shop jokers', G.shop_jokers, args)
+        local button_key = args.buy_and_use and 'buy_and_use_button' or args.redeem and 'buy_button' or 'buy_button'
+        local index = RegressionTester.find_card_in_cardarea(test_context, cardarea_name, cardarea, args)
         if (
-            not G or
             not G.shop_jokers or
             not G.shop_jokers.cards or
             not G.shop_jokers.cards[index] or
@@ -441,19 +464,31 @@ function RegressionTester.actions.Buy_From_Shop(test_context, args)
             not G.shop_jokers.cards[index].children[button_key].UIRoot.children or
             not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1] or
             not G.shop_jokers.cards[index].children[button_key].UIRoot.children[1].click
+            not cardarea.cards[index].children or
+            not cardarea.cards[index].children[button_key].UIRoot.children or
         ) then
-            test_context.fail_and_stop('Test runner could not find the "'..button_key..'" for shop joker '.. tostring(args.key or index))
+            test_context.fail_and_stop('Test runner could not find the "'..button_key..'" for shop card '.. tostring(args.key or index))
         else
-            G.shop_jokers.cards[index].children[button_key].UIRoot.children[1]:click()
+            cardarea.cards[index].children[button_key].UIRoot.children[1]:click()
         end
     end)
     return { loops = 4 }
 end
 
+function RegressionTester.actions.Buy_From_Shop(test_context, args)
+    return RegressionTester.buy_from_shop_cardarea(test_context, 'shop jokers', G.shop_jokers, args)
+end
+
 function RegressionTester.actions.Buy_And_Use_From_Shop(test_context, args)
     args = args or {}
     args.buy_and_use = true
-    return RegressionTester.actions.Buy_From_Shop(test_context, args)
+    return RegressionTester.buy_from_shop_cardarea(test_context, 'shop jokers', G.shop_jokers, args)
+end
+
+function RegressionTester.actions.Redeem_From_Shop(test_context, args)
+    args = args or {}
+    args.redeem = true
+    return RegressionTester.buy_from_shop_cardarea(test_context, 'shop vouchers', G.shop_vouchers, args)
 end
 
 function RegressionTester.actions.Exit_Shop(test_context, args)
@@ -641,7 +676,7 @@ local function run_test(test, mod_context, test_context)
         if not instructions[test_context.instruction_number + 1] then
             test_context.done()
         end
-        if not test_context.finished then
+        if not test_context.finished and RegressionTester.running then
             test_context.instruction_number = test_context.instruction_number + 1
             local enqueue_extra = {}
             if (RegressionTester.slow) then
@@ -701,6 +736,8 @@ local function run_tests(mod_test_groups)
         function test_context.skip()
             test_context.finished = true
             test_context.skipped = true
+            SMODS.cards_to_draw = 0
+            SMODS.drawn_cards = {}
         end
         function test_context.will_finish_through_pause()
             local found_non_meta_instruction = false
@@ -1172,3 +1209,25 @@ local vanilla_tests, err = SMODS.load_file("vanilla-tests.lua", 'RegressionTeste
 if err then error(err) end
 vanilla_tests()
 
+
+G.FUNCS.hand_chip_UI_set = function()
+    for k, v in pairs(G.STATES) do
+        if v == G.STATE then
+            G.GAME.current_round.current_hand.chip_text = k
+        end
+    end
+    e.config.object:update_text()
+end
+
+
+G.FUNCS.chip_UI_set = function(e)
+  local new_chips_text
+  for k, v in pairs(G.STATES) do
+        if v == G.STATE then
+            new_chips_text = k
+        end
+    end
+  if G.GAME.chips_text ~= new_chips_text then
+    G.GAME.chips_text = new_chips_text
+  end
+end

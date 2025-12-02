@@ -575,6 +575,33 @@ Vanilla.regression_tests = {
             }},
         },
     },
+    {
+        name = '8 Ball',
+        seed = 'Look 8 ball bal man',
+        actions = {
+            { action = 'Select_Blind', args = 'small' },
+            { action = 'Set_Blind_Chips', args = 4.2e42 },
+            { action = 'Destroy_All_Cards' },
+            { action = 'Create_Cards', args = {
+                jokers = { 'j_8_ball' },
+                hand = { 'H_8', 'H_8', 'D_8', 'C_8', 'D_8', 'S_8', 'H_8', 'C_8', 'C_8', 'C_8' },
+                vouchers = { 'v_crystal_ball' },
+            }},
+            { action = 'Select_Cards_From_Hand', { 1, 2, 3, 4, 5 }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (constants.FIVE_OF_A_KIND_CHIPS + 8 * 5) * (constants.FIVE_OF_A_KIND_MULT),
+                number_of_consumeables = 3,
+            }},
+            { action = 'Destroy_Consumeables' },
+            { action = 'Select_Cards_From_Hand', { 1, 2, 3, 4, 5 }},
+            { action = 'Play_Hand' },
+            { action = 'Expect', args = {
+                score = (constants.FIVE_OF_A_KIND_CHIPS + 8 * 5) * (constants.FIVE_OF_A_KIND_MULT) * 2,
+                number_of_consumeables = 1,
+            }},
+        },
+    }
 }
 
 
