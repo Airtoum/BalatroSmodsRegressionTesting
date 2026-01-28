@@ -716,6 +716,7 @@ Vanilla.regression_tests = {
             { action = 'Create_Cards', args = {
                 jokers = { 'j_chaos' },
             }},
+            { action = 'Exit_Shop' },
             { action = 'Select_Blind', args = 'big'},
             { action = 'Win_Blind' },
             { action = 'Cash_Out' },
